@@ -52,9 +52,25 @@ function updateHotkeyLabel() {
     recordBtn.textContent = `${s.ctrl ? 'Ctrl + ' : ''}${s.key === ' ' ? 'Space' : s.key.toUpperCase()}`;
 }
 demoChat.addEventListener('keydown', (e) => {
-    if (config.mode === 'smart' && e.key === 'Enter' && !e.shiftKey) {
+    if (config.mode === 'smart' && e.key === 'Enter') {
+        if (e.shiftKey) {
+            // Shift + Enter: Cancel pending send and allow newline
+            if (pendingSend) {
+                clearTimeout(pendingSend);
+                pendingSend = null;
+            }
+            if (newlineModeTimer) clearTimeout(newlineModeTimer);
+            newlineModeTimer = setTimeout(() => {
+                newlineModeTimer = null;
+            }, config.gracePeriod);
+            
+            e.stopImmediatePropagation();
+            demoStatus.innerHTML = `<span class="status-pill intercepted">✨ Shift+Enter: Line Break Allowed</span>`;
+            return;
+        }
+
         if (newlineModeTimer) {
-            e.stopImmediatePropagation(); // Don't let other handlers see this
+            e.stopImmediatePropagation();
             
             clearTimeout(newlineModeTimer);
             newlineModeTimer = setTimeout(() => {
@@ -68,7 +84,7 @@ demoChat.addEventListener('keydown', (e) => {
             clearTimeout(pendingSend);
             pendingSend = null;
             
-            e.stopImmediatePropagation(); // Allow newline, but prevent our internal "send"
+            e.stopImmediatePropagation();
             
             newlineModeTimer = setTimeout(() => {
                 newlineModeTimer = null;

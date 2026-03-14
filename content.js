@@ -18,7 +18,24 @@ document.addEventListener('keydown', (event) => {
     if (target.tagName !== 'TEXTAREA' && target.tagName !== 'DIV' && target.contentEditable !== 'true') return;
 
     if (config.mode === 'smart') {
-        if (event.key === 'Enter' && !event.shiftKey) {
+        if (event.key === 'Enter') {
+            if (event.shiftKey) {
+                // Shift + Enter: Cancel any pending send and allow newline
+                if (safetyTimer) {
+                    clearTimeout(safetyTimer);
+                    safetyTimer = null;
+                }
+                // Also enter/sustain newline mode
+                if (newlineModeTimer) clearTimeout(newlineModeTimer);
+                newlineModeTimer = setTimeout(() => {
+                    newlineModeTimer = null;
+                }, config.gracePeriod);
+                
+                // Let it through to the site/browser
+                event.stopImmediatePropagation();
+                return;
+            }
+
             if (newlineModeTimer) {
                 // Already in newline mode, let it pass naturally to browser (newline)
                 // but NOT to the site's own keydown listener (send)
@@ -56,7 +73,7 @@ document.addEventListener('keydown', (event) => {
             }, config.gracePeriod);
 
         } else {
-            // User pressed a different key
+            // User pressed a different key (not Enter)
             if (safetyTimer) {
                 clearTimeout(safetyTimer);
                 safetyTimer = null;
