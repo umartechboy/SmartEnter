@@ -1,5 +1,6 @@
 let config = { mode: 'smart', shortcut: { ctrl: true, key: 'Space', code: 'Space' }, gracePeriod: 500 };
 let safetyTimer = null;
+let newlineModeTimer = null;
 
 chrome.storage.sync.get(['config'], (result) => {
     if (result.config) config = result.config;
@@ -9,13 +10,63 @@ chrome.storage.sync.get(['config'], (result) => {
 chrome.storage.onChanged.addListener((changes) => {
     if (changes.config) config = changes.config.newValue;
 });
-
 document.addEventListener('keydown', (event) => {
     const isChatGPT = window.location.hostname.includes('chatgpt.com');
     const isGemini = window.location.hostname.includes('gemini.google.com');
     const target = event.target;
 
     if (target.tagName !== 'TEXTAREA' && target.tagName !== 'DIV' && target.contentEditable !== 'true') return;
+
+    if (config.mode === 'smart') {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            if (newlineModeTimer) {
+                // Already in newline mode, let it pass naturally to browser (newline)
+                // but NOT to the site's own keydown listener (send)
+                event.stopImmediatePropagation();
+                
+                clearTimeout(newlineModeTimer);
+                newlineModeTimer = setTimeout(() => {
+                    newlineModeTimer = null;
+                }, config.gracePeriod);
+                return;
+            }
+
+            if (safetyTimer) {
+                // Second Enter within timeout: Abort send and let this Enter through naturally
+                clearTimeout(safetyTimer);
+                safetyTimer = null;
+                
+                // Let the browser handle the newline, but stop the site from sending
+                event.stopImmediatePropagation();
+
+                // Enter Newline Mode
+                newlineModeTimer = setTimeout(() => {
+                    newlineModeTimer = null;
+                }, config.gracePeriod);
+                return;
+            }
+
+            // First Enter: Intercept completely (no newline, no site send)
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            safetyTimer = setTimeout(() => {
+                triggerSend(isChatGPT, isGemini);
+                safetyTimer = null;
+            }, config.gracePeriod);
+
+        } else {
+            // User pressed a different key
+            if (safetyTimer) {
+                clearTimeout(safetyTimer);
+                safetyTimer = null;
+            }
+            if (newlineModeTimer) {
+                clearTimeout(newlineModeTimer);
+                newlineModeTimer = null;
+            }
+        }
+    }
 
     // --- MODE 1: STRICT (Reclaim Enter) ---
     if (config.mode === 'strict') {
@@ -31,30 +82,6 @@ document.addEventListener('keydown', (event) => {
         if (isCtrlMatch && (event.code === config.shortcut.code || event.key === config.shortcut.key)) {
             event.preventDefault();
             triggerSend(isChatGPT, isGemini);
-        }
-    }
-
-    // --- MODE 2: SMART (The Safety Net) ---
-    if (config.mode === 'smart') {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            // 1. Immediately act like a typewriter: Insert the newline
-            document.execCommand('insertText', false, '\n');
-
-            // 2. Start the "Send" timer
-            clearTimeout(safetyTimer);
-            safetyTimer = setTimeout(() => {
-                triggerSend(isChatGPT, isGemini);
-                safetyTimer = null;
-            }, config.gracePeriod);
-
-        } else if (safetyTimer) {
-            // If user types ANYTHING (except Enter) during the wait, 
-            // we just kill the timer. The newline is already there!
-            clearTimeout(safetyTimer);
-            safetyTimer = null;
         }
     }
 }, true);

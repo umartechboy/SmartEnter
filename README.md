@@ -26,7 +26,7 @@ Worse, every accidental send wastes electricity and evaporates water in data cen
 
 ## ✨ Features
 
-* **The "Oops" Detector (Smart Mode):** Keep your muscle memory. Use Enter to send, but with a safety net. If you hit Enter but immediately keep typing, the extension catches the mistake, cancels the send, and converts it into a new line.
+* **The "Oops" Detector (Smart Mode):** Transform the Enter key from a "trigger" into a "conversation." A single Enter press intercepts the send and waits for a brief timeout. If you tap Enter again or keep typing during this window, the send is aborted, letting you continue your thought with as many line breaks as you need. 🚀
 * **Absolute Control (Strict Mode):** Strip the Enter key of its sending power entirely. It becomes a pure carriage return. Map your "Send" command to a deliberate custom hotkey (like `Ctrl + Space` or `F12`).
 * **Sustainability:** Stop the waste. Catching typos before they hit the API saves actual energy and water.
 * **100% Privacy:** No tracking, no logging, no telemetry. Your keystrokes never leave your machine.

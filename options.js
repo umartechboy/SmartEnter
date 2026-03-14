@@ -3,6 +3,7 @@ let config = { mode: 'smart', shortcut: { ctrl: true, key: 'Space', code: 'Space
 const demoChat = document.getElementById('demoChat');
 const demoStatus = document.getElementById('demoStatus');
 let pendingSend = null;
+let newlineModeTimer = null;
 
 // Load Settings
 chrome.storage.sync.get(['config'], (result) => {
@@ -50,29 +51,52 @@ function updateHotkeyLabel() {
     const s = config.shortcut;
     recordBtn.textContent = `${s.ctrl ? 'Ctrl + ' : ''}${s.key === ' ' ? 'Space' : s.key.toUpperCase()}`;
 }
-// --- THE DEMO BOX LOGIC ---
 demoChat.addEventListener('keydown', (e) => {
     if (config.mode === 'smart' && e.key === 'Enter' && !e.shiftKey) {
+        if (newlineModeTimer) {
+            e.stopImmediatePropagation(); // Don't let other handlers see this
+            
+            clearTimeout(newlineModeTimer);
+            newlineModeTimer = setTimeout(() => {
+                newlineModeTimer = null;
+            }, config.gracePeriod);
+            demoStatus.innerHTML = `<span class="status-pill intercepted">✨ Newline Mode: Line Break Allowed</span>`;
+            return; 
+        }
+
+        if (pendingSend) {
+            clearTimeout(pendingSend);
+            pendingSend = null;
+            
+            e.stopImmediatePropagation(); // Allow newline, but prevent our internal "send"
+            
+            newlineModeTimer = setTimeout(() => {
+                newlineModeTimer = null;
+            }, config.gracePeriod);
+            demoStatus.innerHTML = `<span class="status-pill intercepted">✨ Aborted: Line Break Confirmed</span>`;
+            return;
+        }
+
+        // First Enter: Intercept
         e.preventDefault();
+        e.stopImmediatePropagation();
+        demoStatus.innerHTML = `<span class="status-pill intercepted">Holding for Send... (Tap Enter again to break line)</span>`;
 
-        // Immediate visual feedback
-        const start = demoChat.selectionStart;
-        const end = demoChat.selectionEnd;
-        demoChat.value = demoChat.value.substring(0, start) + "\n" + demoChat.value.substring(end);
-        demoChat.selectionStart = demoChat.selectionEnd = start + 1;
-
-        demoStatus.innerHTML = `<span class="status-pill intercepted">Waiting to send...</span>`;
-
-        clearTimeout(pendingSend);
         pendingSend = setTimeout(() => {
             demoStatus.innerHTML = `<span class="status-pill sent">🚀 PROMPT SENT!</span>`;
             demoChat.value = "";
+            pendingSend = null;
         }, config.gracePeriod);
 
-    } else if (pendingSend) {
-        // Any other keypress cancels the send
-        clearTimeout(pendingSend);
-        pendingSend = null;
-        demoStatus.innerHTML = `<span class="status-pill intercepted">✨ OOPS DETECTED: Keeping your text.</span>`;
+    } else if (e.key !== 'Enter') {
+        if (pendingSend) {
+            clearTimeout(pendingSend);
+            pendingSend = null;
+            demoStatus.innerHTML = `<span class="status-pill intercepted">Aborted via Typing</span>`;
+        }
+        if (newlineModeTimer) {
+            clearTimeout(newlineModeTimer);
+            newlineModeTimer = null;
+        }
     }
-});
+}, true); // Use capture phase for the demo as well to simulate content.js behavior
